@@ -1,0 +1,11 @@
+[Unit]
+Description=only-once script
+
+[Service]
+Type=oneshot
+ExecStart=/opt/pgsetup.sh
+RemainAfterExit=true
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target
