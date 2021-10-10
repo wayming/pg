@@ -17,7 +17,7 @@ RUN dnf list -y postgresql*
 RUN dnf install -y postgresql13-server
 RUN dnf install -y net-tools
 RUN dnf install -y python3
-
+ENV PATH="/usr/pgsql-13/bin:${PATH}"
 RUN alternatives --set python /usr/bin/python3
 
 # Install systemctl alternative at last, in case systemd is overriden by other installations.
@@ -27,17 +27,13 @@ RUN tar xvf v${SYSTEMCTL_VERSION}.tar.gz docker-systemctl-replacement-${SYSTEMCT
     /bin/rm -f /usr/bin/systemctl && \
     cp docker-systemctl-replacement-${SYSTEMCTL_VERSION}/files/docker/systemctl.py /usr/bin/systemctl
 
-RUN (cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == systemd-tmpfiles-setup.service ] || rm -vf $i; done) \
+RUN rm -vf /lib/systemd/system/sysinit.target.wants/* \
   ; rm -vf /lib/systemd/system/multi-user.target.wants/* \
   ; rm -vf /etc/systemd/system/*.wants/* \
   ; rm -vf /lib/systemd/system/local-fs.target.wants/* \
   ; rm -vf /lib/systemd/system/sockets.target.wants/*udev* \
   ; rm -vf /lib/systemd/system/sockets.target.wants/*initctl* \
   ; rm -vf /lib/systemd/system/basic.target.wants/*
-
-RUN systemctl start systemd-tmpfiles-setup.service -vvv \
-  ; systemctl status systemd-tmpfiles-setup.service \
-  ; systemctl stop systemd-tmpfiles-setup.service -vvv
 
 # DB user
 ENV PG_USER "test"
@@ -49,16 +45,17 @@ RUN /usr/pgsql-13/bin/postgresql-13-setup initdb
 RUN sed -e "/#listen_addresses/a listen_addresses = '*'" /var/lib/pgsql/13/data/postgresql.conf > /var/lib/pgsql/13/data/postgresql.conf.tmp \
   ; mv /var/lib/pgsql/13/data/postgresql.conf.tmp /var/lib/pgsql/13/data/postgresql.conf
 RUN grep 'listen_addresses\|unix_socket_directories' /var/lib/pgsql/13/data/postgresql.conf
-RUN systemctl start postgresql-13 -vvv \
-  ; systemctl status postgresql-13 \
-  ; systemctl stop postgresql-13 -vvv
 
 # # DB create
-# USER postgres
-# RUN psql -c 'CREATE USER ${PG_USER} WITH PASSWORD \'${PG_PASSWORD}}\' CREATEROLE CREATEDB REPLICATION BYPASSRLS;'
-# RUN /usr/pgsql-13/bin/createdb -e -O $dbusr testdb;
-# RUN psql postgres://$dbusr:$dbpwd@localhost/testdb -c "SELECT 1"
+COPY dbsetup.sh /opt
+RUN  chmod +x /opt/dbsetup.sh
 
-RUN systemctl enable systemd-tmpfiles-setup.service -vvv
+
+USER postgres
+RUN  whoami
+RUN  /opt/dbsetup.sh
+
+USER root
+RUN  whoami
 RUN systemctl enable postgresql-13
 CMD /usr/bin/systemctl
