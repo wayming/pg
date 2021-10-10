@@ -3,12 +3,11 @@
 set -x
 dbusr=test
 dbpwd=test
-
+dbname=testdb
 
 psql <<END
 CREATE USER $dbusr WITH PASSWORD '$dbpwd' CREATEROLE CREATEDB REPLICATION BYPASSRLS;
+CREATE DATABASE $dbname OWNER=$dbusr
 END
 
-/usr/pgsql-13/bin/createdb -e -O $dbusr testdb;
-
-psql postgres://$dbusr:$dbpwd@localhost/testdb -c "SELECT 1"
+psql postgres://$dbusr:$dbpwd@localhost/$dbname -c "SELECT 1"
